@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  api-backend:
+    build:
+      context: ./api-backend
+    ports:
+      - "8080:8080"
+    networks: [testnet]
+
+  nextjs-app:
+    build:
+      context: ./nextjs-app
+    ports:
+      - "3000:3000"
+    environment:
+      API_URL: "http://api-backend:8080"
+    depends_on: [api-backend]
+    networks: [testnet]
+
+networks:
+  testnet:
+    driver: bridge

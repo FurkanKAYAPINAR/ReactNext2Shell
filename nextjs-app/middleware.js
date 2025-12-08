@@ -1,0 +1,1 @@
+export function middleware(req){console.log("Middleware:",req.nextUrl.pathname);}

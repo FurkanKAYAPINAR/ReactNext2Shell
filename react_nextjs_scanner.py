@@ -184,21 +184,65 @@ def print_report(target: str, findings: dict):
     else:
         print(output)
 
+def scan_single_target(target, port, timeout, insecure, verbose):
+    base_url = build_base_url(target, port)
+    if verbose and RICH and console:
+        console.log(f"[blue]Probing base URL[/blue]: {base_url}")
+    elif verbose:
+        print(f"Probing base URL: {base_url}")
+        
+    responses = probe_targets(base_url, timeout=timeout, verify=(not insecure))
+    findings = analyze_responses(responses)
+    print_report(base_url, findings)
+    return base_url, findings
+
 def main():
     parser = argparse.ArgumentParser(description="Safe CVE indicator scanner (heuristic, non-exploitative).")
-    parser.add_argument("target", help="Target URL or IP (e.g. http://host, host, host:port, https://host)")
+    parser.add_argument("target", nargs='?', help="Target URL or IP (e.g. http://host, host, host:port, https://host)")
+    parser.add_argument("-f", "--file", help="Input file containing list of targets (one per line)")
     parser.add_argument("--port", type=int, help="Optional port to override")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="Request timeout seconds (default: 6)")
     parser.add_argument("--insecure", action="store_true", help="Allow insecure TLS (skip verification)")
     parser.add_argument("--verbose", action="store_true", help="Verbose output for debugging")
     args = parser.parse_args()
 
-    base_url = build_base_url(args.target, args.port)
-    if args.verbose and RICH and console:
-        console.log(f"[blue]Probing base URL[/blue]: {base_url}")
-    responses = probe_targets(base_url, timeout=args.timeout, verify=(not args.insecure))
-    findings = analyze_responses(responses)
-    print_report(base_url, findings)
+    targets = []
+    if args.file:
+        try:
+            with open(args.file, 'r') as f:
+                targets = [line.strip() for line in f if line.strip()]
+        except Exception as e:
+            print(f"Error reading file: {e}")
+            sys.exit(1)
+    elif args.target:
+        targets = [args.target]
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+    vulnerable_findings = []
+
+    print(f"[*] Starting scan on {len(targets)} targets...\n")
+
+    for t in targets:
+        try:
+            url, res = scan_single_target(t, args.port, args.timeout, args.insecure, args.verbose)
+            if res["cve_2025_55182"]["indicator"] or res["cve_2025_66478"]["indicator"]:
+                vulnerable_findings.append(url)
+        except Exception as e:
+            print(f"[!] Error scanning {t}: {e}\n")
+
+    if args.file:
+        print("\n" + "="*40)
+        print("BULK SCAN SUMMARY")
+        print("="*40)
+        if vulnerable_findings:
+            print(f"Found {len(vulnerable_findings)} potentially vulnerable targets:")
+            for v in vulnerable_findings:
+                print(f" - {v}")
+        else:
+            print("No vulnerable targets found in the list.")
+        print("="*40)
 
 if __name__ == '__main__':
     main()

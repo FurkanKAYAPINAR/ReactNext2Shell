@@ -49,6 +49,7 @@ It works on:
 ## 🚀 Usage Examples
 
   python3 react_nextjs_scanner.py http://127.0.0.1:3000
+  python3 react_nextjs_scanner.py -f targets.txt --insecure
 
 ## 🐚 Exploitation Shell (Lab)
 
